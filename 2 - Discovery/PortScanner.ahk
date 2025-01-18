@@ -1,142 +1,213 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
-Persistent(true)
 
-global socket := 0
+GetServiceName(port) {
+    static services := Map(
+        20, "ftp-data",
+        21, "ftp",
+        22, "ssh",
+        23, "telnet",
+        25, "smtp",
+        53, "domain",
+        80, "http",
+        110, "pop3",
+        111, "rpcbind",
+        135, "msrpc",
+        139, "netbios-ssn",
+        143, "imap",
+        443, "https",
+        445, "microsoft-ds",
+        993, "imaps",
+        995, "pop3s",
+        1723, "pptp",
+        3306, "mysql",
+        3389, "ms-wbt-server",
+        5900, "vnc",
+        8080, "http-proxy",
+        9929, "nping-echo",
+        31337, "Elite"
+    )
+    return services.Has(port) ? services[port] : "unknown"
+}
 
 Log(msg) {
-    FileAppend "PortTest: " msg "`n", "*"
+    FileAppend msg "`n", "*"
 }
 
-TestPort(ip, port, timeout := 5000) {
-    Try {
-        ; Constants
-        FD_READ := 1
-        FD_CLOSE := 32 
-        FD_CONNECT := 20
-        AF_INET := 2
-        SOCK_STREAM := 1
-        IPPROTO_TCP := 6
-        SizeOfSocketAddress := 16
-        SOCKET_ERROR := -1
-        
-        Log("Starting connection test to " ip ":" port)
+UpdateProgress(current, total) {
+    percentage := Round((current / total) * 100)
+    
+    FileAppend "`rScanning... " " " percentage "% complete", "*"
+}
 
-        ; Initialize WSA
-        Try {
-            wsaData := Buffer(32, 0)
-            result := DllCall("Ws2_32\WSAStartup", "UShort", 0x0202, "Ptr", wsaData.Ptr)
-            if (result != 0) {
-                error := DllCall("Ws2_32\WSAGetLastError")
-                Log("WSAStartup failed with error: " error)
-                return error
-            }
-        } Catch as err {
-            Log("WSAStartup critical error: " err.Message)
-            return -1
+ClearLine() {
+    FileAppend "`r" . String(" ") . "`r", "*"  ; Clear the progress line
+}
+
+ParsePortRange(portRange) {
+    ports := []
+    ranges := StrSplit(portRange, ",")
+    
+    for range in ranges {
+        if InStr(range, "-") {
+            parts := StrSplit(range, "-")
+            if (parts.Length != 2)
+                continue
+                
+            start := Integer(parts[1])
+            end := Integer(parts[2])
+            
+            if (start > end || start < 1 || end > 65535)
+                continue
+                
+            Loop (end - start + 1)
+                ports.Push(start + A_Index - 1)
+        } else {
+            port := Integer(range)
+            if (port >= 1 && port <= 65535)
+                ports.Push(port)
         }
-        
-        Log("WSAStartup successful")
-
-        ; Create socket
-        Try {
-            socket := DllCall("Ws2_32\socket", "Int", AF_INET, "Int", SOCK_STREAM, "Int", IPPROTO_TCP, "Ptr")
-            if (socket = INVALID_SOCKET := -1) {
-                error := DllCall("Ws2_32\WSAGetLastError")
-                Log("Socket creation failed with error: " error)
-                CleanUpConnection()
-                return error
-            }
-        } Catch as err {
-            Log("Socket creation critical error: " err.Message)
-            CleanUpConnection()
-            return -1
-        }
-
-        Log("Socket created successfully")
-
-        ; Convert IP address
-        Try {
-            translatedIP := DllCall("Ws2_32\inet_addr", "AStr", ip, "UInt")
-            if (translatedIP = 0xFFFFFFFF) {
-                Log("Invalid IP address format")
-                CleanUpConnection()
-                return -1
-            }
-        } Catch as err {
-            Log("IP translation critical error: " err.Message)
-            CleanUpConnection()
-            return -1
-        }
-
-        ; Create socket address structure
-        Try {
-            SocketAddress := Buffer(16, 0)  ; sizeof(sockaddr_in) = 16
-            NumPut("UShort", AF_INET, SocketAddress, 0)  ; sin_family
-            NumPut("UShort", DllCall("Ws2_32\htons", "UShort", port), SocketAddress, 2)  ; sin_port
-            NumPut("UInt", translatedIP, SocketAddress, 4)  ; sin_addr
-        } Catch as err {
-            Log("Address structure creation error: " err.Message)
-            CleanUpConnection()
-            return -1
-        }
-
-        Log("Attempting connection...")
-
-        ; Connect
-        Try {
-            result := DllCall("Ws2_32\connect", "Ptr", socket, "Ptr", SocketAddress.Ptr, "Int", 16)
-            if (result = SOCKET_ERROR) {
-                error := DllCall("Ws2_32\WSAGetLastError")
-                Log("Connect failed with error: " error)
-                CleanUpConnection()
-                return error
-            }
-        } Catch as err {
-            Log("Connect critical error: " err.Message)
-            CleanUpConnection()
-            return -1
-        }
-
-        Log("Connection successful!")
-        CleanUpConnection()
-        return 0
-
-    } Catch as err {
-        Log("Unexpected error: " err.Message)
-        Try {
-            CleanUpConnection()
-        }
-        return -1
     }
+    
+    return ports
 }
 
-CleanUpConnection() {
-    Try {
-        if (socket != 0) {
-            DllCall("Ws2_32\closesocket", "Ptr", socket)
-            Log("Socket closed")
-        }
+TestPort(ip, port) {
+    ; Constants
+    AF_INET := 2
+    SOCK_STREAM := 1
+    IPPROTO_TCP := 6
+    SOCKET_ERROR := -1
+    WSAECONNREFUSED := 10061
+    WSAETIMEDOUT := 10060
+
+    ; Initialize WSA
+    wsaData := Buffer(408)
+    if (DllCall("Ws2_32\WSAStartup", "UShort", 0x0202, "Ptr", wsaData)) {
+        Log("WSAStartup failed")
+        return "error"
+    }
+
+    ; Create socket
+    sock := DllCall("Ws2_32\socket", "Int", AF_INET, "Int", SOCK_STREAM, "Int", IPPROTO_TCP)
+    if (sock = -1) {
         DllCall("Ws2_32\WSACleanup")
-        Log("WSA Cleaned up")
-    } Catch as err {
-        Log("Cleanup error: " err.Message)
+        Log("Socket creation failed")
+        return "error"
     }
+
+    ; Set timeout (3 seconds)
+    timeout := Buffer(8, 0)
+    NumPut("Int", 3000, timeout, 0)
+    DllCall("Ws2_32\setsockopt", "Ptr", sock, "Int", 0xFFFF, "Int", 0x1005, "Ptr", timeout, "Int", 4)
+    DllCall("Ws2_32\setsockopt", "Ptr", sock, "Int", 0xFFFF, "Int", 0x1006, "Ptr", timeout, "Int", 4)
+
+    ; Create sockaddr structure
+    sockaddr := Buffer(16, 0)
+    NumPut("UShort", AF_INET, sockaddr, 0)
+    NumPut("UShort", DllCall("Ws2_32\htons", "UShort", port), sockaddr, 2)
+    NumPut("UInt", DllCall("Ws2_32\inet_addr", "AStr", ip), sockaddr, 4)
+
+    ; Try to connect
+    result := DllCall("Ws2_32\connect", "Ptr", sock, "Ptr", sockaddr, "Int", 16)
+    
+    ; Get error code if connection failed
+    error := 0
+    if (result = SOCKET_ERROR) {
+        error := DllCall("Ws2_32\WSAGetLastError")
+    }
+
+    ; Clean up
+    DllCall("Ws2_32\closesocket", "Ptr", sock)
+    DllCall("Ws2_32\WSACleanup")
+
+    ; Return appropriate status
+    if (result = 0)
+        return "open"
+    else if (error = WSAECONNREFUSED)
+        return "closed"
+    else if (error = WSAETIMEDOUT)
+        return "filtered"
+    else
+        return "filtered"  ; Most other errors indicate filtering
 }
 
 ; Main script
-Log("Script starting...")
+startTime := A_TickCount
 
-Try {
-    test := TestPort("8.8.8.8", "53")
-    if (test) {
-        Log("Test failed with error code: " test)
-    } else {
-        Log("Connected successfully")
+; Initial output
+Log("Starting AutoPwnKey Port Scanner at " FormatTime(, "yyyy-MM-dd HH:mm") " " )
+Log("")
+
+; Parse and scan ports
+ports := ParsePortRange("20-25,53,80,110,111,135,139,143,443,445,993,995,1723,3306,3389,5900,8080,9929,31337")
+host := "45.33.32.156"
+Log("Scan report for " host)
+Log("")
+
+
+openPorts := []
+closedPorts := []
+filteredPorts := []
+
+totalPorts := ports.Length
+scannedPorts := 0
+
+; Scan all ports first
+for port in ports {
+    result := TestPort(host, port)
+    scannedPorts++
+    
+    switch result {
+        case "open":
+            openPorts.Push(port)
+        case "closed":
+            closedPorts.Push(port)
+        case "filtered":
+            filteredPorts.Push(port)
     }
-} Catch as err {
-    Log("Main script error: " err.Message)
+    
+    UpdateProgress(scannedPorts, totalPorts)
+    Sleep(100)
 }
 
-Sleep(1000)
+; Clear the progress line
+ClearLine()
+
+; Calculate stats
+closedCount := closedPorts.Length
+filteredCount := filteredPorts.Length
+openCount := openPorts.Length
+
+; Print final report
+if (closedCount = totalPorts) {
+    Log("All " totalPorts " scanned ports are closed")
+} else {
+    if (closedCount > 0) {
+        Log("Not shown: " closedCount " closed tcp ports")
+    }
+    if (filteredCount > 0) {
+        Log(filteredCount " filtered port" (filteredCount = 1 ? "" : "s"))
+    }
+    
+    Log("")
+    Log("PORT      STATE    SERVICE")
+    
+    ; Print open ports
+    for port in openPorts {
+        serviceName := GetServiceName(port)
+        Log(Format("{:-8}/tcp {:-8} {}", port, "open", serviceName))
+    }
+    
+    ; Print filtered ports
+    for port in filteredPorts {
+        serviceName := GetServiceName(port)
+        Log(Format("{:-8}/tcp {:-8} {}", port, "filtered", serviceName))
+    }
+}
+
+; Print timing information
+elapsedTime := (A_TickCount - startTime) / 1000
+Log("`nScan completed in " Format("{:.2f}", elapsedTime) " seconds")
+
 ExitApp
