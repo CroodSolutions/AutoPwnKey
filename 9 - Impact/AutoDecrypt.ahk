@@ -1,5 +1,15 @@
 #Requires AutoHotkey v2.0
 
+Log(msg, logFile := "logfile.txt") {
+    logMessage :=  msg "`n"
+    
+    try {
+        FileAppend(logMessage, "*")
+    } catch Error as err {
+        FileAppend(logMessage, logFile)
+    }
+}
+
 Decrypt(encryptedBuffer, password) {
     ; Create crypto provider and hash
     hProvider := Buffer(A_PtrSize)
@@ -45,12 +55,12 @@ Decrypt(encryptedBuffer, password) {
 DecryptDirectory(targetFolder, password) {
     Loop Files, targetFolder "\*.encrypted", "FR"
     {
-        FileAppend "Processing: " A_LoopFileName "`n", "*"
+        Log("Processing: " A_LoopFileName "`n")
         
         ; Read the encrypted file
         fileObj := FileOpen(A_LoopFileFullPath, "r-d")
         if !fileObj {
-            FileAppend "Failed to open file`n", "*"
+            Log("Failed to open file`n")
             continue
         }
         
@@ -72,10 +82,10 @@ DecryptDirectory(targetFolder, password) {
                 fileObj.RawWrite(decryptedData, decryptedData.Size)
                 fileObj.Close()
                 FileDelete(A_LoopFileFullPath)
-                FileAppend "Successfully decrypted to: " newPath "`n", "*"
+                Log("Successfully decrypted to: " newPath "`n")
             }
         } catch Error as err {
-            FileAppend "Error: " err.Message "`n", "*"
+            Log("Error: " err.Message "`n")
         }
     }
 }

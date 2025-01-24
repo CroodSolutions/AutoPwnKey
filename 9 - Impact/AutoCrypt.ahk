@@ -1,6 +1,16 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 
+Log(msg, logFile := "logfile.txt") {
+    logMessage :=  msg "`n"
+    
+    try {
+        FileAppend(logMessage, "*")
+    } catch Error as err {
+        FileAppend(logMessage, logFile)
+    }
+}
+
 Encrypt(data, password) {
     ; Create a buffer from the input data (assuming it's binary)
     dataBuffer := Buffer(data.Size)
@@ -57,12 +67,12 @@ EncryptDirectory(targetFolder, password) {
         if (StrLower(SubStr(A_LoopFileName, -9)) = ".encrypted")
             continue
             
-        FileAppend "Processing: " A_LoopFileName "`n", "*"
+        Log("Processing: " A_LoopFileName "`n")
         
         ; Read the original file as binary
         fileObj := FileOpen(A_LoopFileFullPath, "r-d")  ; binary mode
         if !fileObj {
-            FileAppend "Failed to open file`n", "*"
+            Log("Failed to open file`n")
             continue
         }
         
@@ -83,13 +93,13 @@ EncryptDirectory(targetFolder, password) {
             fileObj.RawWrite(encryptedData, encryptedData.Size)
             fileObj.Close()
             FileDelete(A_LoopFileFullPath)
-            FileAppend "Successfully encrypted to: " newPath "`n", "*"
+            Log("Successfully encrypted to: " newPath "`n")
         }
     }
 }
 
 targetFolder := A_MyDocuments "\Crypttest"
-passwordLocation := A_Desktop "\AutoCrypt_Password.txt"
+; passwordLocation := A_Desktop "\AutoCrypt_Password.txt"
 password := "Test1"
 
 EncryptDirectory(targetFolder, password)

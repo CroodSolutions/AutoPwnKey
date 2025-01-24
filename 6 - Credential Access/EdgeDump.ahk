@@ -45,4 +45,4 @@ BackupEdgeData(backupRoot := "C:\tmp") {
     }
 }
 
-; BackupEdgeData(path)    Backs up to target path  
+BackupEdgeData(A_Desktop) ; Put your target backup location here. Using desktop as example

@@ -45,4 +45,4 @@ BackupChromeData(backupRoot := "C:\tmp") {
     }
 }
 
-; BackupChromeData(path)      Backs up to target path 
+BackupChromeData(A_Desktop) ; Put your target backup location here. Using desktop as example

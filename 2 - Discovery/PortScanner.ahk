@@ -30,18 +30,20 @@ GetServiceName(port) {
     return services.Has(port) ? services[port] : "unknown"
 }
 
-Log(msg) {
-    FileAppend msg "`n", "*"
+Log(msg, logFile := "logfile.txt") {
+    logMessage :=  msg "`n"
+    
+    try {
+        FileAppend(logMessage, "*")
+    } catch Error as err {
+        FileAppend(logMessage, logFile)
+    }
 }
 
 UpdateProgress(current, total) {
     percentage := Round((current / total) * 100)
     
-    FileAppend "`rScanning... " " " percentage "% complete", "*"
-}
-
-ClearLine() {
-    FileAppend "`r" . String(" ") . "`r", "*"  ; Clear the progress line
+    Log("`rScanning... " " " percentage "% complete")
 }
 
 ParsePortRange(portRange) {
@@ -170,10 +172,6 @@ for port in ports {
     UpdateProgress(scannedPorts, totalPorts)
     Sleep(100)
 }
-
-; Clear the progress line
-ClearLine()
-
 ; Calculate stats
 closedCount := closedPorts.Length
 filteredCount := filteredPorts.Length
