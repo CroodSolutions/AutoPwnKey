@@ -123,17 +123,58 @@ CreateLocalUser(username := "NewUser", password := "P@ssw0rd123!", fullname := "
 }
 
 AddUserToAdminGroup(username) {
-    Log "Starting AddUserToAdminGroup for user: " username
+    Log("Starting AddUserToAdminGroup for user: " username)
     
     try {
-        result := RunWait('cmd.exe /c net localgroup Administrators "' username '" /add',, "Hide")
-        if (result != 0) {
-            throw Error("Failed to add user to Administrators group", -1, result)
+        ; Create LOCALGROUP_MEMBERS_INFO_3 structure (only contains domainandname field)
+        memberInfo := Buffer(A_PtrSize, 0)  ; Size of one pointer
+        
+        ; Store the username pointer
+        usernamePtr := StrPtr(username)
+        NumPut("Ptr", usernamePtr, memberInfo, 0)
+        
+        Log("Calling NetLocalGroupAddMembers...")
+        Log("  Username ptr: " format("0x{:X}", usernamePtr))
+        Log("  Buffer ptr: " format("0x{:X}", memberInfo.Ptr))
+        
+        ; Call NetLocalGroupAddMembers
+        result := DllCall("Netapi32\NetLocalGroupAddMembers",
+            "Ptr", 0,                    ; servername (NULL = local)
+            "Str", "Administrators",      ; groupname
+            "UInt", 3,                   ; level (using LOCALGROUP_MEMBERS_INFO_3)
+            "Ptr", memberInfo.Ptr,       ; buf
+            "UInt", 1,                   ; totalentries (adding 1 member)
+            "UInt")                      ; return type
+        
+        lastError := A_LastError
+        Log("NetLocalGroupAddMembers result: " result)
+        Log("LastError: " lastError)
+        
+        ; Check for specific error codes
+        if (result = 0) {
+            Log("Successfully added user to Administrators group")
+        } else {
+            errorMessage := ""
+            switch result {
+                case 1377:  ; ERROR_MEMBER_IN_ALIAS
+                    errorMessage := "User is already a member of the group"
+                case 1378:  ; NERR_GroupNotFound
+                    errorMessage := "Administrators group not found"
+                case 1387:  ; ERROR_NO_SUCH_MEMBER
+                    errorMessage := "User account not found"
+                case 1388:  ; ERROR_INVALID_MEMBER
+                    errorMessage := "Invalid user account"
+                case 5:     ; ERROR_ACCESS_DENIED
+                    errorMessage := "Access denied"
+                default:
+                    errorMessage := "Unknown error: " result
+            }
+            throw Error("Failed to add user to Administrators group: " errorMessage, -1, result)
         }
-        Log "Successfully added user to Administrators group"
+        
     } catch Error as err {
-        FileAppend "Error adding user to group: " err.Message " (Code: " err.Extra ")", "*"
-        MsgBox "Error adding user to Administrators group:`n" err.Message, "Error", "16"
+        Log("Error adding user to group: " err.Message " (Code: " err.Extra ")")
+        MsgBox("Error adding user to Administrators group:`n" err.Message, "Error", "16")
     }
 }
 
