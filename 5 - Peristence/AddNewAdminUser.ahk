@@ -42,7 +42,7 @@ ERROR_CODES := Map(
     ERROR_INVALID_LEVEL := 124, "Invalid level."
 )
 
-CreateLocalUser(username := "NewUser", password := "P@ssw0rd123!", fullname := "New Local User") {
+CreateLocalUser(username := "TestUser", password := "P@ssw0rd123!", fullname := "Test User") {
     Log("Starting CreateLocalUser function")
     
     try {

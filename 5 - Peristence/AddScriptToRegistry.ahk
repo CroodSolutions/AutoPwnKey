@@ -1,6 +1,6 @@
 #Requires AutoHotkey v2.0
 
-CheckAndSetStartup() {
+AddScriptToRegistry() {
     subKey := "Software\Microsoft\Windows\CurrentVersion\Run"
     valueName := "StartUp_1"
     scriptPath := A_ScriptFullPath
@@ -9,4 +9,4 @@ CheckAndSetStartup() {
     RegWrite(value, "REG_SZ", "HKEY_CURRENT_USER\" subKey, valueName)
 }
 
-CheckAndSetStartup()
+AddScriptToRegistry()
