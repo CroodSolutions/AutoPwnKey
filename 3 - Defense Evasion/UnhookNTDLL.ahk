@@ -28,7 +28,7 @@ class NTDLLManipulator {
         this.btnReadFile := this.gui.Add("Button", "x20 y500 w160 h30", "Test NtReadFile") ; TODO: There are no logs for this without being unhooked?
         this.btnWriteFile := this.gui.Add("Button", "x200 y500 w160 h30", "Test NtWriteFile")
         ;this.btnRegistry := this.gui.Add("Button", "x380 y500 w160 h30", "Test Registry") TODO: Fix this
-        ;this.btnNetConn := this.gui.Add("Button", "x20 y540 w160 h30", "Test NetConnection")
+        ;this.btnNetConn := this.gui.Add("Button", "x20 y540 w160 h30", "Test NetConnection") TODO: Fix this
     
         ; Bind button events
         this.btnTakeSnapshot.OnEvent("Click", ObjBindMethod(this, "TakeInitialSnapshot"))
@@ -545,63 +545,101 @@ class NTDLLManipulator {
     }
 
     CheckForChanges(*) {
-        if (!this.snapshots.Has(1)) {
-            this.LogWrite("Error: No initial snapshots available. Please take snapshots first.")
+        FileAppend("Starting change detection...`n", "ntdll_check.log")
+        
+        ; Get clean NTDLL file bytes first
+        ntdllPath := A_WinDir . "\System32\ntdll.dll"
+        hFile := DllCall("CreateFileW", "Str", ntdllPath, "UInt", 0x80000000, "UInt", 3, "Ptr", 0, "UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
+        if (hFile = -1) {
+            FileAppend("Failed to open NTDLL file`n", "ntdll_check.log")
             return false
         }
         
-        hProcess := DllCall("GetCurrentProcess", "Ptr")
+        ; Create file mapping
+        hMapping := DllCall("CreateFileMapping", "Ptr", hFile, "Ptr", 0, "UInt", 0x02, "UInt", 0, "UInt", 0, "Ptr", 0, "Ptr")
+        if (!hMapping) {
+            DllCall("CloseHandle", "Ptr", hFile)
+            FileAppend("Failed to create file mapping`n", "ntdll_check.log")
+            return false
+        }
+        
+        ; Map view of file
+        cleanView := DllCall("MapViewOfFile", "Ptr", hMapping, "UInt", 0x4, "UInt", 0, "UInt", 0, "UInt", 0, "Ptr")
+        if (!cleanView) {
+            DllCall("CloseHandle", "Ptr", hMapping)
+            DllCall("CloseHandle", "Ptr", hFile)
+            FileAppend("Failed to map view of file`n", "ntdll_check.log")
+            return false
+        }
+        
+        ; Get NTDLL base and functions
+        hNTDLL := DllCall("GetModuleHandle", "Str", "ntdll.dll", "Ptr")
         functions := ["NtCreateFile", "NtReadFile", "NtWriteFile", "NtClose"]
-        monitorSize := 0x1000  
-        changesFound := false
+        checkSize := 0x1000  ; Increased size to check
         
         loop functions.Length {
-            i := A_Index
-            if (!this.snapshots.Has(i)) {
-                this.LogWrite("Skipping " . functions[i] . " - No initial snapshot available")
+            funcName := functions[A_Index]
+            funcAddr := DllCall("GetProcAddress", "Ptr", hNTDLL, "AStr", funcName, "Ptr")
+            
+            if (!funcAddr) {
+                FileAppend("Failed to get address for " . funcName . "`n", "ntdll_check.log")
                 continue
             }
             
-            ; Get current function address
-            funcAddr := DllCall("GetProcAddress", 
-                "Ptr", DllCall("GetModuleHandle", "Str", "ntdll.dll", "Ptr"),
-                "AStr", functions[i],
-                "Ptr")
+            ; Get function RVA (Relative Virtual Address)
+            rva := funcAddr - hNTDLL
+            FileAppend("`nChecking " . funcName . " at RVA: 0x" . Format("{:X}", rva) . "`n", "ntdll_check.log")
             
-            newDump := this.DumpMemorySection(hProcess, funcAddr, monitorSize)
-            if (!newDump) {
-                this.LogWrite("Failed to take second snapshot of " . functions[i])
+            ; Dump current memory
+            memBuff := Buffer(checkSize, 0)
+            if (!DllCall("ReadProcessMemory", 
+                "Ptr", DllCall("GetCurrentProcess", "Ptr"),
+                "Ptr", funcAddr,
+                "Ptr", memBuff.Ptr,
+                "UInt", checkSize,
+                "UInt*", &bytesRead := 0)) {
+                FileAppend("Failed to read memory for " . funcName . "`n", "ntdll_check.log")
                 continue
             }
             
+            ; Compare with clean file (checking first 256 bytes for detailed analysis)
             differences := 0
-            modifications := ""
+            detailedLog := ""
             
-            ; Analyze first 32 bytes
-            this.LogWrite("First 32 bytes of " . functions[i] . ":")
-            hexDump := ""
-            loop 32 {
-                byte1 := NumGet(this.snapshots[i], A_Index-1, "UChar")
-                byte2 := NumGet(newDump, A_Index-1, "UChar")
-                hexDump .= Format("{:02X} ", byte2)
+            loop 256 {
+                memByte := NumGet(memBuff, A_Index-1, "UChar")
+                cleanByte := NumGet(cleanView + rva, A_Index-1, "UChar")
                 
-                if (byte1 != byte2) {
-                    differences += 1
-                    modifications .= Format("  Offset 0x{:02X}: {:02X} -> {:02X}`n", 
-                        A_Index-1, byte1, byte2)
-                    changesFound := true
+                if (memByte != cleanByte) {
+                    differences++
+                    detailedLog .= Format("Offset +{:X}: {:02X} -> {:02X}`n", 
+                        A_Index-1, cleanByte, memByte)
                 }
             }
-            this.LogWrite(hexDump)
+            
+            ; Log both clean and current bytes for comparison
+            FileAppend("Clean bytes: ", "ntdll_check.log")
+            loop 32 {
+                FileAppend(Format("{:02X} ", NumGet(cleanView + rva, A_Index-1, "UChar")), "ntdll_check.log")
+            }
+            FileAppend("`nCurrent bytes: ", "ntdll_check.log")
+            loop 32 {
+                FileAppend(Format("{:02X} ", NumGet(memBuff, A_Index-1, "UChar")), "ntdll_check.log")
+            }
+            FileAppend("`n", "ntdll_check.log")
             
             if (differences > 0) {
-                this.LogWrite("`n" . functions[i] . " was modified!")
-                this.LogWrite("Found " . differences . " changes:")
-                this.LogWrite(modifications)
+                FileAppend(funcName . " has " . differences . " modifications:`n", "ntdll_check.log")
+                FileAppend(detailedLog, "ntdll_check.log")
             } else {
-                this.LogWrite(functions[i] . " was not modified.")
+                FileAppend(funcName . " matches clean file`n", "ntdll_check.log")
             }
         }
+        
+        ; Cleanup
+        DllCall("UnmapViewOfFile", "Ptr", cleanView)
+        DllCall("CloseHandle", "Ptr", hMapping)
+        DllCall("CloseHandle", "Ptr", hFile)
         
         return true
     }
