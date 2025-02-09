@@ -24,6 +24,7 @@ We welcome and encourage contributions, participation, and feedback - as long as
 ## --- Acknowledgments ---
 
 Most of the content here in this form, was the direct creation of [shammahwoods](https://github.com/shammahwoods) as of the time of release, in terms of either creating things outright or porting things over to this new framework. That said, we are building upon the foundation previously built by several other friends/collaborators/researchers including: 
+- [Markofka007](https://github.com/Markofka007)
 - [AnuraTheAmphibian](https://github.com/AnuraTheAmphibian)
 - [christian-taillon](https://github.com/christian-taillon)
 - [Duncan4264](https://github.com/Duncan4264)
@@ -31,6 +32,5 @@ Most of the content here in this form, was the direct creation of [shammahwoods]
 - [Kitsune-Sec](https://github.com/Kitsune-Sec)
 - [matt-handy](https://github.com/matt-handy)
 - [rayzax](https://github.com/rayzax)
-- [Markofka007](https://github.com/Markofka007)
 
 (and many we either forgot to mention or who made key contributions after publication)
