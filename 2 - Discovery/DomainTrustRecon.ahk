@@ -1,20 +1,21 @@
 #Requires AutoHotkey v2.0
-SetWorkingDir(A_ScriptDir)  ; Ensure a consistent starting directory.
+SetWorkingDir(A_ScriptDir)  ; Use the script’s directory.
 
-; Retrieve the domain name from the environment variable.
-domain := EnvGet("USERDOMAIN")
-if (domain == "")
-{
-    MsgBox("Could not retrieve the domain name from USERDOMAIN.", "Error", 16)
-    ExitApp()
-}
+; Delete the existing output.txt file if it exists.
+if FileExist("output.txt")
+    FileDelete("output.txt")
 
-; Build the command string to query the domain controllers.
-cmd := EnvGet("ComSpec") . " /c nltest /dclist:" . domain . " > output.txt"
+; Get the path to the command interpreter (cmd.exe).
+comspec := EnvGet("ComSpec")
 
-; Run the command and wait for it to finish (the window is hidden).
+; Write header for Trusted Domains.
+cmd := comspec . " /c echo Trusted Domains: > output.txt"
 RunWait(cmd, "", "Hide")
 
-; Notify the user that the output has been written.
-MsgBox("The list of domain controllers for " . Chr(34) . domain . Chr(34) . " has been written to output.txt.")
+; Append the output of the /trusted_domains command.
+cmd := comspec . " /c nltest /trusted_domains >> output.txt"
+RunWait(cmd, "", "Hide")
+
+
+MsgBox("The domain trust information has been written to output.txt.")
 ExitApp()
