@@ -1,3 +1,6 @@
+# AutoPwnKey
+![AutoPwnKey Agent Manager]("1 - Covert Malware Delivery and Ingress Tool Transfer\AutoPwnKey-server\resources\AgentManager.png")
+
 ## --- Introduction ---
 
 AutoPwnKey is a framework we have created with two purposes in mind. On one hand, we want to raise awareness about the security risk presented by AutoHotKey (and AutoIT). That said, we understand that these problems are unlikely to be resolved anytime soon; at least, if red teams are not using AHK and AutoIT as part of their testing (thus demonstrating the evasiveness). We released BypassIT as a relatively weak framework initially, hoping that proving the evasiveness and capability AutoIT affords attackers would lead to immediate change.  It did not. This time around, we have learned from our mistakes and are trying to release AutoPwnKey in a state where it will be instrumental in helping the Red Teamer(s) succeed in engagements.
