@@ -1,5 +1,5 @@
 # AutoPwnKey
-![AutoPwnKey Agent Manager]("1 - Covert Malware Delivery and Ingress Tool Transfer\AutoPwnKey-server\resources\AgentManager.png")
+![AutoPwnKey Agent Manager](1 - Covert Malware Delivery and Ingress Tool Transfer\AutoPwnKey-server\resources\AgentManager.png)
 
 ## --- Introduction ---
 
